@@ -1,0 +1,128 @@
+pushd $IMG_OUT_DIR
+
+DEVICE=@DEVICE@
+
+VERSION_FILE=./os-release
+source $VERSION_FILE
+
+# Locate rootfs tar.bz2 archive.
+for filename in *.tar.bz2; do
+    GEN_IMG_BASE=$(basename $filename .tar.bz2)
+done
+
+if [ ! -e "$GEN_IMG_BASE.tar.bz2" ]; then
+    echo "No rootfs archive found, exiting ..."
+    exit 1
+fi
+
+IMG_SIZE=$(du -h $GEN_IMG_BASE.tar.bz2 | cut -f1)
+
+# Output filenames
+DST_IMG_BASE=$ID-$DEVICE-$SAILFISH_FLAVOUR-$VERSION_ID@EXTRA_NAME@
+DST_IMG=$DST_IMG_BASE.tar.bz2
+
+# Copy boot image, updater scripts and updater binary into updater .zip tree.
+mkdir -p updater/META-INF/com/google/android
+if [ ! -s updater/busybox ]; then
+    echo "ERROR: BusyBox extraction failed!"
+    exit 1
+fi
+chmod 755 updater/busybox
+
+# Verify that the binary is a statically linked ARM executable.
+if command -v file >/dev/null 2>&1; then
+    BB_INFO=$(file -b updater/busybox)
+
+    case "$BB_INFO" in
+        *ELF*ARM*"statically linked"*)
+            echo "BusyBox verified: $BB_INFO"
+            ;;
+        *)
+            echo "ERROR: Invalid BusyBox executable: $BB_INFO"
+            exit 1
+            ;;
+    esac
+fi
+
+mv update-binary updater/META-INF/com/google/android/update-binary
+mv hybris-updater-script updater/META-INF/com/google/android/updater-script
+mv hybris-updater-unpack.sh updater/updater-unpack.sh
+mv hybris-boot.img updater/hybris-boot.img
+
+# Add BusyBox extraction and permission setup to updater-script.
+
+SCRIPT=updater/META-INF/com/google/android/updater-script
+
+INSERT_AFTER='package_extract_file("updater-unpack.sh", "/tmp/updater-unpack.sh");'
+
+if [ "$(grep -Fxc "$INSERT_AFTER" "$SCRIPT")" -ne 1 ]; then
+    echo "ERROR: Unexpected updater-script structure!"
+    exit 1
+fi
+
+awk -v anchor="$INSERT_AFTER" '
+    { print }
+
+    $0 == anchor {
+        print "package_extract_file(\"busybox\", \"/tmp/busybox\");"
+        print "set_metadata(\"/tmp/busybox\", \"uid\", 0, \"gid\", 0, \"mode\", 0755);"
+    }
+' "$SCRIPT" > "$SCRIPT.new"
+
+mv "$SCRIPT.new" "$SCRIPT"
+
+# Replace the TWRP tar extraction with static BusyBox.
+
+cat > updater/updater-unpack.sh <<'EOF'
+#!/sbin/sh
+
+FS_ARC="/data/sailfishos-rootfs.tar.bz2"
+FS_DST="/data/.stowaways/sailfishos"
+
+# Remove any incomplete previous Sailfish installation.
+rm -rf "$FS_DST" || exit 1
+
+mkdir -p "$FS_DST" || exit 1
+
+# Extract using the included static BusyBox.
+/tmp/busybox tar --numeric-owner -xjf "$FS_ARC" -C "$FS_DST"
+
+EXIT=$?
+
+# Remove the archive only after successful extraction.
+if [ "$EXIT" -eq 0 ]; then
+    rm -f "$FS_ARC"
+fi
+
+exit "$EXIT"
+EOF
+
+chmod 755 updater/updater-unpack.sh
+
+# Temporarily move the rootfs into the updater directory
+mv $GEN_IMG_BASE.tar.bz2 updater/$DST_IMG
+
+# Update updater-script with image details.
+sed -i -e "s %VERSION% $VERSION_ID g" -e "s %IMAGE_FILE% $DST_IMG g" -e "s %IMAGE_SIZE% $IMG_SIZE g" updater/META-INF/com/google/android/updater-script
+
+# Pack updater ZIP, including the static BusyBox executable.
+pushd updater
+
+zip -r ../$DST_IMG_BASE.zip \
+    META-INF/com/google/android/update-binary \
+    META-INF/com/google/android/updater-script \
+    updater-unpack.sh \
+    busybox \
+    hybris-boot.img \
+    $DST_IMG_BASE.ks \
+    $DST_IMG
+
+popd # updater
+
+# Move the rootfs back out of the updater directory
+mv updater/$DST_IMG $GEN_IMG_BASE.tar.bz2
+
+# Clean up updater .zip working directory.
+rm -rf updater
+
+popd # $IMG_OUT_DIR
