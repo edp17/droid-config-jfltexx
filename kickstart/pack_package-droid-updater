@@ -23,10 +23,25 @@ DST_IMG=$DST_IMG_BASE.tar.bz2
 
 # Copy boot image, updater scripts and updater binary into updater .zip tree.
 mkdir -p updater/META-INF/com/google/android
-if [ ! -s updater/busybox ]; then
-    echo "ERROR: BusyBox extraction failed!"
+
+# Always stage the tested static ARM BusyBox; never reuse an old ZIP-staging copy.
+# Explicit override takes precedence. Otherwise look for the Android build
+# output, then a binary pre-staged in IMG_OUT_DIR as ./busybox.
+BB_SRC="${SFOS_ZIP_BUSYBOX:-}"
+if [ -z "$BB_SRC" ] && [ -n "${ANDROID_ROOT:-}" ]; then
+    BB_ANDROID="$ANDROID_ROOT/out/target/product/$DEVICE/utilities/busybox"
+    if [ -s "$BB_ANDROID" ]; then
+        BB_SRC="$BB_ANDROID"
+    fi
+fi
+if [ -z "$BB_SRC" ] && [ -s ./busybox ]; then
+    BB_SRC=./busybox
+fi
+if [ -z "$BB_SRC" ] || [ ! -s "$BB_SRC" ]; then
+    echo "ERROR: Static ARM BusyBox not found. Set SFOS_ZIP_BUSYBOX or place busybox in IMG_OUT_DIR."
     exit 1
 fi
+cp -f "$BB_SRC" updater/busybox || exit 1
 chmod 755 updater/busybox
 
 # Verify that the binary is a statically linked ARM executable.
