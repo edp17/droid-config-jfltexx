@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# Galaxy S4 RNDIS uses usb0 rather than rndis0.
+# Modify the configuration supplied by jolla-developer-mode
+# without introducing overlapping RPM file ownership.
+
+CONFIG=/etc/usb-moded/dyn-modes/developer_mode-android.ini
+
+[ -f "$CONFIG" ] || exit 0
+
+if grep -Eq '^[[:space:]]*network_interface[[:space:]]*=[[:space:]]*rndis0[[:space:]]*$' "$CONFIG"; then
+    sed -i \
+        's/^[[:space:]]*network_interface[[:space:]]*=[[:space:]]*rndis0[[:space:]]*$/network_interface = usb0/' \
+        "$CONFIG"
+fi
+
+exit 0
