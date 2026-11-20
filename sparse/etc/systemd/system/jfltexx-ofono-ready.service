@@ -1,0 +1,11 @@
+[Unit]
+Description=Galaxy S4 modem readiness monitor for oFono
+After=droid-hal-init.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/droid/wait-modem-ready.sh
+Restart=no
+
+[Install]
+WantedBy=multi-user.target
