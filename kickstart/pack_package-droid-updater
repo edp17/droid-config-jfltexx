@@ -59,16 +59,6 @@ if command -v file >/dev/null 2>&1; then
     esac
 fi
 
-# The verified camera compatibility payload must be prepared in IMG_OUT_DIR
-# before packing the release. Never silently produce a camera-broken ZIP.
-if [ ! -s ./jfltexx-camera-system.tar ] || [ ! -s ./jfltexx-camera-system-install.sh ]; then
-    echo "ERROR: Missing jfltexx camera payload or recovery installer in IMG_OUT_DIR."
-    echo "Run prepare-jfltexx-camera-system.sh with the verified build and backup files."
-    exit 1
-fi
-cp -f ./jfltexx-camera-system.tar updater/jfltexx-camera-system.tar || exit 1
-cp -f ./jfltexx-camera-system-install.sh updater/jfltexx-camera-system-install.sh || exit 1
-
 mv update-binary updater/META-INF/com/google/android/update-binary
 mv hybris-updater-script updater/META-INF/com/google/android/updater-script
 mv hybris-updater-unpack.sh updater/updater-unpack.sh
@@ -91,9 +81,6 @@ awk -v anchor="$INSERT_AFTER" '
     $0 == anchor {
         print "package_extract_file(\"busybox\", \"/tmp/busybox\");"
         print "set_metadata(\"/tmp/busybox\", \"uid\", 0, \"gid\", 0, \"mode\", 0755);"
-        print "package_extract_file(\"jfltexx-camera-system.tar\", \"/tmp/jfltexx-camera-system.tar\");"
-        print "package_extract_file(\"jfltexx-camera-system-install.sh\", \"/tmp/jfltexx-camera-system-install.sh\");"
-        print "set_metadata(\"/tmp/jfltexx-camera-system-install.sh\", \"uid\", 0, \"gid\", 0, \"mode\", 0755);"
     }
 ' "$SCRIPT" > "$SCRIPT.new"
 
@@ -127,21 +114,6 @@ EOF
 
 chmod 755 updater/updater-unpack.sh
 
-# Apply the Android camera fix AFTER rootfs extraction but BEFORE flashing
-# hybris-boot.img. /data is still mounted for backups at this point.
-ROOTFS_EXTRACT_DONE='run_program("/tmp/updater-unpack.sh") == "0" || abort("Failed to extract filesystem!");'
-if [ "$(grep -Fxc "$ROOTFS_EXTRACT_DONE" "$SCRIPT")" -ne 1 ]; then
-    echo "ERROR: Unexpected rootfs-install completion marker in updater-script!"
-    exit 1
-fi
-awk -v anchor="$ROOTFS_EXTRACT_DONE" '
-    { print }
-    $0 == anchor {
-        print "run_program(\"/tmp/jfltexx-camera-system-install.sh\") == \"0\" || abort(\"Failed to apply Galaxy S4 Android camera fixes!\");"
-    }
-' "$SCRIPT" > "$SCRIPT.new"
-mv "$SCRIPT.new" "$SCRIPT"
-
 # Temporarily move the rootfs into the updater directory
 mv $GEN_IMG_BASE.tar.bz2 updater/$DST_IMG
 
@@ -156,8 +128,6 @@ zip -r ../$DST_IMG_BASE.zip \
     META-INF/com/google/android/updater-script \
     updater-unpack.sh \
     busybox \
-    jfltexx-camera-system.tar \
-    jfltexx-camera-system-install.sh \
     hybris-boot.img \
     $DST_IMG_BASE.ks \
     $DST_IMG
