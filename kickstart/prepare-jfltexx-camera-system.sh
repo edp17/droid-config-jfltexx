@@ -1,5 +1,5 @@
 #!/bin/bash
-# Stage the eight VERIFIED jfltexx camera/media Android-system binaries for the
+# Stage the nine VERIFIED jfltexx camera/media Android-system binaries for the
 # Sailfish updater ZIP. This script must run on the build PC, not the phone.
 set -euo pipefail
 
@@ -54,6 +54,7 @@ a3450728d0fff1744b3b3e73ef7f25e13a665f0d8572f355d440f53a1104d23e system/vendor/l
 f51f77429f667746aad56c622db47751c813ceb097ad43155bbecc11b039a508 system/vendor/lib/android.hardware.camera.provider@2.4-legacy.jf.so PRODUCT:system/vendor/lib/android.hardware.camera.provider@2.4-legacy.jf.so
 18551a89077d93a1d10a49dded27c050606d71c75d085b2767307867bef0e77e system/vendor/lib/hw/android.hardware.camera.provider@2.4-impl.jf.so PRODUCT:system/vendor/lib/hw/android.hardware.camera.provider@2.4-impl.jf.so
 ef29deed4c7b8c0777a0ab8f1bcdd2b205c198d58bab1c826ed7fdcc2aca16d5 system/lib/libstagefright.so BACKUP:libstagefright.so
+748f382ab66ff1128b1354f8edbb71a33999856603ae3c2436729eea3d1e3aff system/lib/libcameraservice.so PRODUCT:system/lib/libcameraservice.so
 3285ff587f61b5f36063de618582c3f582944f0470bf466d9e89028d3d80b7ca system/bin/mediaextractor PRODUCT:system/bin/mediaextractor
 29365016dacca5493dfd2f4498ed46c7932f89f34e809e8e28ba73a3c9026898 system/apex/com.android.media.swcodec/bin/mediaswcodec PRODUCT:system/bin/mediaswcodec
 21977adb6c0651b198dff48210f58aae808821ac04807e684527aa4e7e2aafb0 system/apex/com.android.runtime.release/bin/linker BACKUP:linker
